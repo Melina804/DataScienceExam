@@ -1,0 +1,130 @@
+---
+title: "Data Science Exam"
+author: "Melina Vejlø"
+date: "5/10/2022"
+output: html_document
+---
+
+```{r setup}
+# Importing needed libraries 
+pacman::p_load(tidyverse, neuralnet, corrplot, dplyr, reshape2, keras)
+
+
+# Importing data 
+EFA <- read_tsv("/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/GrandEFA_factor_loadings.tsv")
+HRD <- read_tsv("/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/hrd.tsv")
+
+```
+
+
+## Data Inspection
+
+```{r HRD}
+
+# Visually inspecting the data 
+
+## How many participants in the HRD?
+HRDBase <- filter(HRD, modality == "Intero" & task == "BaseHRD")
+HRDBase <- subset(HRDBase, select = -c(breath_condition))
+HRDBase <- na.omit(HRDBase)
+
+count(HRDBase) # 510 participants in the HRD
+
+# Filtering out relevant variables in the HRD Data 
+HRDBase <- subset(HRDBase, select = c(participant_id, modality, task, psi_threshold, psi_slope))
+
+``` 
+
+```{r EFA}
+## How many participants in the EFA factor loadings? 
+EFA <- na.omit(EFA)
+EFA <- subset(EFA, select = -c(...1))
+EFA_mental_health <- subset(EFA, select = c(participant_id, Negative_Health))
+count(EFA) #545 participants in the EFA 
+count(EFA_mental_health)
+
+```
+
+```{r Merging and normalizing data}
+
+# Merging HRD data and EFA negative health data 
+combined_negative_health <- merge(HRDBase, EFA_mental_health)
+
+# Removing non-numeric coloumns
+num_combined_negativ_health <- subset(combined_negative_health, select = c(psi_threshold, psi_slope, Negative_Health))
+
+# Normalizing the data 
+minMax <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+ 
+#normalise data using function
+normalised_negative_health <- as.data.frame(lapply(num_combined_negativ_health, minMax))
+head(normalised_negative_health)
+
+
+## How many overlapping participants in combined_negative health?
+count(num_combined_negativ_health) # 502 overlapping participants
+
+```
+
+```{r Inspecting merged data}
+
+# Minumum and maximum values 
+min(combined_negative_health$psi_threshold) # lowest threshold value is -48.53679
+max(combined_negative_health$psi_threshold) # maximum thresgold value is 44.46467
+mean(combined_negative_health$psi_threshold)
+sd(combined_negative_health$psi_threshold)
+min(combined_negative_health$psi_slope) # Lowest slope value is 3.183695
+max(combined_negative_health$psi_slope) # higest slope value is 23.05056
+mean(combined_negative_health$psi_slope)
+sd(combined_negative_health$psi_slope)
+min(combined_negative_health$Negative_Health) # Lowest negative health value is -1.960253
+max(combined_negative_health$Negative_Health) # Highest negative health value is 4.585801
+mean(combined_negative_health$Negative_Health)
+sd(combined_negative_health$Negative_Health)
+
+
+# Minumum and maximum normlaized values 
+min(normalised_negative_health$psi_threshold) # lowest threshold value is 0
+max(normalised_negative_health$psi_threshold) # maximum thresgold value is 1
+mean(normalised_negative_health$psi_threshold) # 0.4335966
+sd(normalised_negative_health$psi_threshold) # 0.1268775
+min(normalised_negative_health$psi_slope) # Lowest slope value is 0
+max(normalised_negative_health$psi_slope) # higest slope value is 1
+mean(normalised_negative_health$psi_slope) # 0.4067619
+sd(normalised_negative_health$psi_slope) # 0.207814
+min(normalised_negative_health$Negative_Health) # Lowest negative health value is 0
+max(normalised_negative_health$Negative_Health) # Highest negative health value is 1
+mean(normalised_negative_health$Negative_Health) # 0.2969769
+sd(normalised_negative_health$Negative_Health) # 0.1540096
+
+
+
+```
+
+
+## Preparing data for Neural Network
+
+```{r Neural Network prep}
+
+# Splitting the data into training and test data for negative health
+dt = sort(sample(1:nrow(num_combined_negativ_health), nrow(num_combined_negativ_health)*.7))
+train_negative_health <-num_combined_negativ_health[dt,]
+test_negative_health <-num_combined_negativ_health[-dt,]
+
+# Savning the CSV files 
+write.csv(train_negative_health,"/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/train_negative_health", row.names = FALSE)
+write.csv(test_negative_health,"/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/test_negative_health", row.names = FALSE)
+
+
+# Splitting the normalized data
+dt = sort(sample(1:nrow(normalised_negative_health), nrow(normalised_negative_health)*.8))
+train_norm_negative_health <-normalised_negative_health[dt,]
+test_norm_negative_health <-normalised_negative_health[-dt,]
+
+# Savning the CSV files 
+write.csv(train_norm_negative_health,"/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/train_norm_negative_health", row.names = FALSE)
+write.csv(test_norm_negative_health,"/Users/melina/Documents/Cognitive_Science/8.semester/Data_Science/Exam/test_norm_negative_health", row.names = FALSE)
+
+```
